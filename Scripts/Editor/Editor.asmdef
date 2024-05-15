@@ -1,6 +1,6 @@
 {
-    "name": "",
-    "rootNamespace": "",
+    "name": "DoubTech.ThirdParty.AI.Common.Editor",
+    "rootNamespace": "DoubTech.ThirdParty.AI.Common",
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
