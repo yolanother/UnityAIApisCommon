@@ -10,10 +10,10 @@ namespace Networking
 {
     public static class RestUtils
     {
-        public static async Task<string> GetDataAsync(this IApiConfig config, string url)
+        public static string GenerateFullUrl(this IApiConfig config, string baseUrl)
         {
             // Create a url to configure and add parameters to
-            UriBuilder uri = new UriBuilder(url);
+            UriBuilder uri = new UriBuilder(baseUrl);
 
             if (config is IQueryParameterAuth auth)
             {
@@ -27,7 +27,13 @@ namespace Networking
                     uri.Query = $"{auth.QueryParameterName}={auth.ApiKey}";
                 }
             }
-            
+
+            return uri.ToString();
+        }
+        
+        public static async Task<string> GetDataAsync(this IApiConfig config, string url)
+        {
+            var uri = config.GenerateFullUrl(url);
             try
             {
                 using (HttpClient _httpClient = new HttpClient())

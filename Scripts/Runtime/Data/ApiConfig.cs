@@ -1,5 +1,4 @@
 ﻿using UnityEditor;
-using UnityEditor.VersionControl;
 using UnityEngine;
 using Task = System.Threading.Tasks.Task;
 
@@ -7,6 +6,7 @@ namespace DoubTech.ThirdParty.AI.Common.Data
 {
     public abstract class ApiConfig : ScriptableObject, IApiConfig
     {
+        public abstract string[] Models { get; }
         public abstract string GetUrl(params string[] path);
         public abstract Task RefreshModels();
     }
