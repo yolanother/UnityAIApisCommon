@@ -34,9 +34,10 @@ namespace DoubTech.ThirdParty.AI.Common
         public UnityEvent<string> onFullResponseReceived = new UnityEvent<string>();
         public UnityEvent<string> onError = new UnityEvent<string>();
 
+        public bool Stream => stream;
         public string Model => model;
         
-        private string _currentResponse;
+        private Response _currentResponse;
 
         private List<Message> _messageHistory = new List<Message>();
         private Message _partialPrompt;
@@ -151,7 +152,7 @@ namespace DoubTech.ThirdParty.AI.Common
 
         IEnumerator SendRequest(UnityWebRequest request)
         {
-            _currentResponse = "";
+            _currentResponse = new Response();
             yield return request.SendWebRequest();
 
             if (request.result == UnityWebRequest.Result.ConnectionError ||
@@ -171,9 +172,9 @@ namespace DoubTech.ThirdParty.AI.Common
             _messageHistory.Add(new Message
             {
                 role = Roles.Assistant,
-                content = _currentResponse
+                content = _currentResponse.response
             });
-            onFullResponseReceived?.Invoke(_currentResponse);
+            onFullResponseReceived?.Invoke(_currentResponse.response);
             Debug.Log(_currentResponse);
         }
 
@@ -195,32 +196,32 @@ namespace DoubTech.ThirdParty.AI.Common
             }
         }
 
-        protected abstract Response OnHandleStreamedResponse(string blob);
+        protected abstract Response OnHandleStreamedResponse(string blob, Response currentResponse);
         private void HandleStreamedData(string blob)
         {
-            HandleResponseData(OnHandleStreamedResponse(blob));
+            HandleResponseData(OnHandleStreamedResponse(blob, _currentResponse));
         }
 
-        protected abstract Response OnHandleResponse(string blob);
+        protected abstract Response OnHandleResponse(string blob, Response currentResponse);
 
         private void HandleFullData(string blob)
         {
-            HandleResponseData(OnHandleResponse(blob));
+            HandleResponseData(OnHandleResponse(blob, _currentResponse));
         }
 
         private void HandleResponseData(Response processedResponse)
         {
             if (null != processedResponse)
             {
+                _currentResponse = processedResponse;
                 if (!string.IsNullOrEmpty(processedResponse.error))
                 {
                     onError?.Invoke(processedResponse.error);
                 }
-                else if (!string.IsNullOrEmpty(processedResponse.currentResponse))
+                else if (!string.IsNullOrEmpty(processedResponse.response))
                 {
-                    _currentResponse = processedResponse.currentResponse;
-                    if(processedResponse.isFullResponse) onFullResponseReceived?.Invoke(processedResponse.currentResponse);
-                    else onPartialResponseReceived?.Invoke(processedResponse.currentResponse);
+                    if(processedResponse.isFullResponse) onFullResponseReceived?.Invoke(processedResponse.response);
+                    else onPartialResponseReceived?.Invoke(processedResponse.response);
                 }
             }
         }
