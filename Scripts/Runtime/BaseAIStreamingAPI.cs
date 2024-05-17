@@ -5,6 +5,7 @@ using System.IO;
 using System.Text;
 using DoubTech.ThirdParty.AI.Common.Attributes;
 using DoubTech.ThirdParty.AI.Common.Data;
+using Meta.Voice.NPCs.OpenAIApi.Providers;
 using Networking;
 using Newtonsoft.Json;
 using UnityEditor;
@@ -16,8 +17,8 @@ namespace DoubTech.ThirdParty.AI.Common
 {
     public abstract class BaseAIStreamingAPI : MonoBehaviour
     {
-        [Header("Prompt Config")] [SerializeField]
-        private BasePrompt basePrompt;
+        [Header("Prompt Config")]
+        [SerializeField] private BasePrompt basePrompt;
 
         [SerializeField] private Message[] messages;
 
@@ -42,6 +43,18 @@ namespace DoubTech.ThirdParty.AI.Common
         private List<Message> _messageHistory = new List<Message>();
         private Message _partialPrompt;
         private Request _requestData;
+
+        protected virtual void OnEnable()
+        {
+            if(!basePrompt)
+            {
+                var provider = GetComponent<IBasePromptProvider>();
+                if (null != provider)
+                {
+                    basePrompt = provider.BasePrompt;
+                }
+            }
+        } 
 
         public Message[] MessageHistory
         {
