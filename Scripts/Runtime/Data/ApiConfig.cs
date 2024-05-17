@@ -7,6 +7,7 @@ namespace DoubTech.ThirdParty.AI.Common.Data
     public abstract class ApiConfig : ScriptableObject, IApiConfig
     {
         public abstract string[] Models { get; }
+        public virtual string[] ModelDisplayNames => Models;
         public abstract string GetUrl(params string[] path);
         public abstract Task RefreshModels();
     }

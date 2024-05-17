@@ -287,7 +287,6 @@ namespace DoubTech.ThirdParty.AI.Common
                     });
                 }
                 onFullResponseReceived?.Invoke(_currentResponse.response);
-                Debug.Log(_currentResponse);
             }
 
             return _currentResponse;

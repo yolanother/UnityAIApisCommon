@@ -5,6 +5,7 @@ namespace DoubTech.ThirdParty.AI.Common.Data
     public interface IApiConfig
     {
         public string[] Models { get; }
+        public abstract string[] ModelDisplayNames { get; }
         public string GetUrl(params string[] path);
         public Task RefreshModels();
     }
