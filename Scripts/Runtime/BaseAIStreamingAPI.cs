@@ -2,7 +2,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Threading.Tasks;
 using DoubTech.ThirdParty.AI.Common.Attributes;
 using DoubTech.ThirdParty.AI.Common.Data;
 using Meta.Voice.NPCs.OpenAIApi.Providers;
@@ -18,8 +21,9 @@ namespace DoubTech.ThirdParty.AI.Common
     public abstract class BaseAIStreamingAPI : MonoBehaviour
     {
         [Header("Prompt Config")]
+        [SerializeField]
+        public bool preserveMessageHistory = true;
         [SerializeField] private BasePrompt basePrompt;
-
         [SerializeField] private Message[] messages;
 
         [Header("Server Config")] 
@@ -38,35 +42,35 @@ namespace DoubTech.ThirdParty.AI.Common
         public bool Stream => stream;
         public string Model => model;
         
+        public BasePrompt BasePrompt {
+            get => basePrompt;
+            set => basePrompt = value;
+        }
+        
         private Response _currentResponse;
 
         private List<Message> _messageHistory = new List<Message>();
-        private Message _partialPrompt;
         private Request _requestData;
-
-        protected virtual void OnEnable()
-        {
-            if(!basePrompt)
+        
+        private List<Message> BaseMessageHistory {
+            get 
             {
-                var provider = GetComponent<IBasePromptProvider>();
-                if (null != provider)
+                // Combine base prompt messages, messages, and a new message for prompt
+                var allMessages = new List<Message>();
+                if (BasePrompt != null)
                 {
-                    basePrompt = provider.BasePrompt;
+                    allMessages.AddRange(BasePrompt.messages);
                 }
+                
+                return allMessages;
             }
-        } 
+        }
 
         public Message[] MessageHistory
         {
             get
             {
-                
-                // Combine base prompt messages, messages, and a new message for prompt
-                var allMessages = new List<Message>();
-                if (basePrompt != null)
-                {
-                    allMessages.AddRange(basePrompt.messages);
-                }
+                var allMessages = BaseMessageHistory;
 
                 if (messages != null)
                 {
@@ -77,46 +81,58 @@ namespace DoubTech.ThirdParty.AI.Common
                 return allMessages.ToArray();
             }
         }
+        
+        protected virtual void OnEnable() {
+            if(!basePrompt)
+            {
+                var provider = GetComponent<IBasePromptProvider>();
+                if (null != provider)
+                {
+                    basePrompt = provider.BasePrompt;
+                }
+            }
+        }
 
         public void PartialPrompt(string prompt)
         {
             if (string.IsNullOrEmpty(prompt)) return;
-            if (null == _partialPrompt)
-            {
-                _partialPrompt = new Message()
-                {
-                    role = Roles.User,
-                    content = prompt
-                };
-                _messageHistory.Add(_partialPrompt);
-            }
-
-            _partialPrompt.content = prompt;
-            Submit();
+            var promptMessages = OnPrepareMessages(prompt, true, false);
+            if(null == promptMessages) return;
+            Submit(promptMessages, false);
         }
+        
+        protected virtual List<Message> OnPrepareMessages(string prompt, bool includeMessageHistory, bool saveMessageHistory) {
+            return OnPrepareMessages(null, prompt, includeMessageHistory, saveMessageHistory); 
+        }
+        
+        protected virtual List<Message> OnPrepareMessages(IEnumerable<Message> additionalMessages, string prompt, bool includeMessageHistory, bool saveMessageHistory) {
+            List<Message> promptMessages = new List<Message>();
+            var promptMessage = new Message
+             {
+                 role = Roles.User,
+                 content = prompt
+             };
 
+            if(includeMessageHistory) promptMessages.AddRange(MessageHistory);
+            if(null != additionalMessages) promptMessages.AddRange(additionalMessages);
+            promptMessages.Add(promptMessage);
+            if(saveMessageHistory) _messageHistory.Add(promptMessage);
+            
+            return promptMessages;
+        }
+            
+
+        // Submits a prompt and maintains a history of submissions and responses
         public void Prompt(string prompt)
         {
-            if (null != _partialPrompt && prompt == _partialPrompt.content)
-            {
-                _partialPrompt = null;
-                return;
-            }
-
-            if (null == _partialPrompt)
-            {
-                _messageHistory.Add(new Message
-                {
-                    role = Roles.User,
-                    content = prompt
-                });
-            }
-            else
-            {
-                _partialPrompt = null;
-            }
-
-            Submit();
+            Prompt(prompt, true);
+        }
+        
+        public void Prompt(string prompt, bool includeMessageHistory)
+        {
+            var promptMessages = OnPrepareMessages(prompt, includeMessageHistory, includeMessageHistory);
+            if(null == promptMessages) return;
+            Submit(promptMessages, includeMessageHistory);
         }
 
         protected virtual string GetRole(Roles role)
@@ -124,13 +140,22 @@ namespace DoubTech.ThirdParty.AI.Common
             return role.ToString().ToLower();
         }
 
-        private void Submit()
+        private void Submit(List<Message> promptMessages, bool saveMessageHistory)
+        {
+            var request = OnPrepareRequest(promptMessages);
+            
+            StopAllCoroutines();
+            StartCoroutine(SendRequest(request, saveMessageHistory));
+        }
+
+        #region Coroutine
+        protected virtual UnityWebRequest OnPrepareRequest(List<Message> promptMessages)
         {
             _requestData = new Request
             {
                 config = apiConfig,
                 model = model,
-                messages = MessageHistory,
+                messages = promptMessages.ToArray(),
                 stream = stream
             };
             var postData = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(OnPrepareData(_requestData)));
@@ -149,21 +174,15 @@ namespace DoubTech.ThirdParty.AI.Common
             {
                 request.SetRequestHeader("Authorization", "Bearer " + bearerAuth.ApiKey);
             }
-
-            if (apiConfig is IQueryParameterAuth queryParameterAuth)
-            {
-                
-            }
-
-            StopAllCoroutines();
-            StartCoroutine(SendRequest(request));
+            
+            return request;
         }
 
         protected abstract object OnPrepareData(Request requestData);
 
         protected abstract string[] OnGetRequestPath();
 
-        IEnumerator SendRequest(UnityWebRequest request)
+        IEnumerator SendRequest(UnityWebRequest request, bool saveMessageHistory)
         {
             _currentResponse = new Response();
             yield return request.SendWebRequest();
@@ -182,14 +201,98 @@ namespace DoubTech.ThirdParty.AI.Common
             {
                 yield return null;
             }
-            _messageHistory.Add(new Message
+            if(preserveMessageHistory && saveMessageHistory) 
             {
-                role = Roles.Assistant,
-                content = _currentResponse.response
-            });
+                _messageHistory.Add(new Message
+                {
+                    role = Roles.Assistant,
+                    content = _currentResponse.response
+                });
+            }
             onFullResponseReceived?.Invoke(_currentResponse.response);
             Debug.Log(_currentResponse);
         }
+        #endregion
+        
+        #region Async        
+        public async Task<Response> PromptAsync(string prompt, bool includeMessageHistory = true)
+        {
+            var promptMessages = OnPrepareMessages(prompt, includeMessageHistory, includeMessageHistory);
+            var request = await OnPostAsync(promptMessages);
+            return await SendRequestAsync(request, includeMessageHistory);
+        }
+
+        public async Task<Response> PromptAsync(Message[] messages, string prompt, bool includeMessageHistory = true)
+        {
+            var promptMessages = OnPrepareMessages(messages, prompt, includeMessageHistory, includeMessageHistory);
+            var request = await OnPostAsync(promptMessages);
+            return await SendRequestAsync(request, includeMessageHistory);
+        }
+        
+        protected struct RequestData
+        {
+            public string url;
+            public string content;
+        }
+
+        protected virtual async Task<RequestData> OnPostAsync(List<Message> promptMessages)
+        {   
+            _requestData = new Request
+            {
+                config = apiConfig,
+                model = model,
+                messages = promptMessages.ToArray(),
+                stream = stream
+            };
+            var postData = JsonConvert.SerializeObject(OnPrepareData(_requestData));
+            string url = apiConfig.GetUrl(OnGetRequestPath());
+            url = apiConfig.GenerateFullUrl(url);
+            
+            Debug.Log("Full url: " + url);
+        
+            return new RequestData {
+                url = url,
+                content = postData
+            };
+        }
+        
+        protected virtual async Task<Response> SendRequestAsync(RequestData request, bool includeMessageHistory)
+        {
+            using var client = new HttpClient();
+            var content = new StringContent(request.content);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            if (apiConfig is IBearerAuth bearerAuth)
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerAuth.ApiKey);
+            }
+            var response = await client.PostAsync(request.url, content);
+            _currentResponse = new Response();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _currentResponse.error = $"Status Code: {response.StatusCode}\nReason: {response.ReasonPhrase}\n\nContent: {errorContent}\n\nRequest Content: {request.content}";
+                Debug.LogError(_currentResponse.error);
+            }
+            else
+            {
+                var result = await response.Content.ReadAsStringAsync();
+                _currentResponse = Stream ? OnHandleStreamedResponse(result, _currentResponse)
+                    : OnHandleResponse(result, _currentResponse);
+                if(preserveMessageHistory && includeMessageHistory) 
+                {
+                    _messageHistory.Add(new Message
+                    {
+                        role = Roles.Assistant,
+                        content = _currentResponse.response
+                    });
+                }
+                onFullResponseReceived?.Invoke(_currentResponse.response);
+                Debug.Log(_currentResponse);
+            }
+
+            return _currentResponse;
+        }
+        #endregion
 
         private void OnDataReceived(byte[] data)
         {
