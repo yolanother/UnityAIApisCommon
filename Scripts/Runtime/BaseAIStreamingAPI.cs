@@ -172,6 +172,10 @@ namespace DoubTech.ThirdParty.AI.Common
 
             if (apiConfig is IBearerAuth bearerAuth)
             {
+                if(string.IsNullOrEmpty(bearerAuth.ApiKey))
+                {
+                    Debug.LogError($"Missing api key on config attached to {name}");
+                }
                 request.SetRequestHeader("Authorization", "Bearer " + bearerAuth.ApiKey);
             }
             
@@ -263,6 +267,10 @@ namespace DoubTech.ThirdParty.AI.Common
             content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             if (apiConfig is IBearerAuth bearerAuth)
             {
+                if(string.IsNullOrEmpty(bearerAuth.ApiKey))
+                {
+                    Debug.LogError($"Missing api key on config attached to {name}");
+                }
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerAuth.ApiKey);
             }
             var response = await client.PostAsync(request.url, content);

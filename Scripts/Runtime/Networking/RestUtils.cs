@@ -17,6 +17,11 @@ namespace Networking
 
             if (config is IQueryParameterAuth auth)
             {
+                 if(string.IsNullOrEmpty(auth.ApiKey))
+                 {
+                     Debug.LogError($"Missing api key on config attached to {(config as MonoBehaviour)?.name ?? config.ToString()}");
+                 }
+                 
                 // Safely add the query parameter to the url
                 if (uri.Query.Length > 1)
                 {
