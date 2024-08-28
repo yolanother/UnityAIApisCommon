@@ -2,8 +2,8 @@
 Foundation library for a set of LLM based APIs. This is the common library that provides the base classes and shared functionality that any of the different LLM implementations may use. On its own this library doesn't do much. You will want to grab one of the LLM implmenentations.
 
 ## Implementations
-[Open AI](https://github.com/yolanother/UnityOpenAIAPI) - Works for any API that is structured on the Open AI based rest APIs.
-[Gemini](https://github.com/yolanother/UnityGeminiAPI) - Provides an implementation for Google's Gemini based API
+* [Open AI](https://github.com/yolanother/UnityOpenAIAPI) - Works for any API that is structured on the Open AI based rest APIs.
+* [Gemini](https://github.com/yolanother/UnityGeminiAPI) - Provides an implementation for Google's Gemini based API
 
 ## Installation
 ### Option 1: Package Manager
