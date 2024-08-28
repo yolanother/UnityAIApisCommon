@@ -11,6 +11,7 @@ using DoubTech.ThirdParty.AI.Common.Data;
 using Meta.Voice.NPCs.OpenAIApi.Providers;
 using Networking;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Events;
@@ -147,7 +148,15 @@ namespace DoubTech.ThirdParty.AI.Common
             StopAllCoroutines();
             StartCoroutine(SendRequest(request, saveMessageHistory));
         }
-
+        public class LowercaseUnderscoreEnumConverter : StringEnumConverter
+        {
+            public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+            {
+                string enumText = value.ToString();
+                string lowercaseUnderscoreText = enumText.ToLowerInvariant().Replace(" ", "_");
+                writer.WriteValue(lowercaseUnderscoreText);
+            }
+        }
         #region Coroutine
         protected virtual UnityWebRequest OnPrepareRequest(List<Message> promptMessages)
         {
@@ -158,7 +167,11 @@ namespace DoubTech.ThirdParty.AI.Common
                 messages = promptMessages.ToArray(),
                 stream = stream
             };
-            var postData = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(OnPrepareData(_requestData)));
+            var postString = JsonConvert.SerializeObject(OnPrepareData(_requestData), new JsonSerializerSettings
+            {
+                Converters = new List<JsonConverter> { new LowercaseUnderscoreEnumConverter() }
+            });
+            var postData = Encoding.UTF8.GetBytes(postString);
 
             string url = apiConfig.GetUrl(OnGetRequestPath());
             url = apiConfig.GenerateFullUrl(url);
