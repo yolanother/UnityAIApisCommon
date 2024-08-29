@@ -10,5 +10,14 @@ namespace DoubTech.ThirdParty.AI.Common
         [SerializeField] public Roles role;
         [TextArea]
         [SerializeField] public string content;
+
+        public static implicit operator Message(string content)
+        {
+            return new Message
+            {
+                role = Roles.User,
+                content = content
+            };
+        }
     }
 }

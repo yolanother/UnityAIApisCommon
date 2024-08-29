@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -148,6 +149,7 @@ namespace DoubTech.ThirdParty.AI.Common
             StopAllCoroutines();
             StartCoroutine(SendRequest(request, saveMessageHistory));
         }
+        
         public class LowercaseUnderscoreEnumConverter : StringEnumConverter
         {
             public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -158,23 +160,41 @@ namespace DoubTech.ThirdParty.AI.Common
             }
         }
         #region Coroutine
-        protected virtual UnityWebRequest OnPrepareRequest(List<Message> promptMessages)
+
+        protected string OnSerializePost(Request request)
+        {
+            return JsonConvert.SerializeObject(OnPrepareData(request), new JsonSerializerSettings
+            {
+                Converters = new List<JsonConverter> { new LowercaseUnderscoreEnumConverter() }
+            });
+        }
+
+        private byte[] PreparePostData(IEnumerable<Message> messages)
         {
             _requestData = new Request
             {
                 config = apiConfig,
                 model = model,
-                messages = promptMessages.ToArray(),
+                messages = messages.ToArray(),
                 stream = stream
             };
-            var postString = JsonConvert.SerializeObject(OnPrepareData(_requestData), new JsonSerializerSettings
-            {
-                Converters = new List<JsonConverter> { new LowercaseUnderscoreEnumConverter() }
-            });
+            var postString = OnSerializePost(_requestData);
             var postData = Encoding.UTF8.GetBytes(postString);
+            return postData;
+        }
 
+        private string PrepareRequestUrl()
+        {
             string url = apiConfig.GetUrl(OnGetRequestPath());
             url = apiConfig.GenerateFullUrl(url);
+            return url;
+        }
+        
+        protected virtual UnityWebRequest OnPrepareRequest(List<Message> promptMessages)
+        {
+            var postData = PreparePostData(promptMessages);
+            var url = PrepareRequestUrl();
+
             var request = new UnityWebRequest(url, "POST")
             {
                 uploadHandler = new UploadHandlerRaw(postData),
@@ -245,14 +265,27 @@ namespace DoubTech.ThirdParty.AI.Common
             var request = await OnPostAsync(promptMessages);
             return await SendRequestAsync(request, includeMessageHistory);
         }
-        
+
+        /// <summary>
+        /// Create an LLM request with no message history/tracking. This is good for asking random functional questions
+        /// to the llm. None of the response events will be processed in this result and you will ge the raw response
+        /// data back to process yourself.
+        /// </summary>
+        /// <param name="messages">The set of messages to send as the request prompt</param>
+        /// <returns>The response including the response text or any errors</returns>
+        public async Task<Response> LlmRequestAsync(params Message[] messages)
+        {
+            var request = await OnPostAsync(messages);
+            return await SendUnhandledRequestAsync(request);
+        }
+
         protected struct RequestData
         {
             public string url;
             public string content;
         }
 
-        protected virtual async Task<RequestData> OnPostAsync(List<Message> promptMessages)
+        protected virtual async Task<RequestData> OnPostAsync(IEnumerable<Message> promptMessages)
         {   
             _requestData = new Request
             {
@@ -261,7 +294,7 @@ namespace DoubTech.ThirdParty.AI.Common
                 messages = promptMessages.ToArray(),
                 stream = stream
             };
-            var postData = JsonConvert.SerializeObject(OnPrepareData(_requestData));
+            var postData = OnSerializePost(_requestData);
             string url = apiConfig.GetUrl(OnGetRequestPath());
             url = apiConfig.GenerateFullUrl(url);
             
@@ -311,6 +344,36 @@ namespace DoubTech.ThirdParty.AI.Common
             }
 
             return _currentResponse;
+        }
+        
+        protected virtual async Task<Response> SendUnhandledRequestAsync(RequestData request)
+        {
+            using var client = new HttpClient();
+            var content = new StringContent(request.content);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            if (apiConfig is IBearerAuth bearerAuth)
+            {
+                if(string.IsNullOrEmpty(bearerAuth.ApiKey))
+                {
+                    Debug.LogError($"Missing api key on config attached to {name}");
+                }
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerAuth.ApiKey);
+            }
+            var response = await client.PostAsync(request.url, content);
+            var processedResponse = new Response();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                processedResponse.error = $"Status Code: {response.StatusCode}\nReason: {response.ReasonPhrase}\n\nContent: {errorContent}\n\nRequest Content: {request.content}";
+                Debug.LogError(processedResponse.error);
+            }
+            else
+            {
+                var result = await response.Content.ReadAsStringAsync();
+                processedResponse = OnHandleResponse(result, processedResponse);
+            }
+
+            return processedResponse;
         }
         #endregion
 
