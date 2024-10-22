@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using DoubTech.ThirdParty.AI.Common.Attributes;
 using DoubTech.ThirdParty.AI.Common.Data;
+using DoubTech.ThirdParty.AI.Common.Interfaces;
 using Meta.Voice.NPCs.OpenAIApi.Providers;
 using Networking;
 using Newtonsoft.Json;
@@ -40,6 +41,9 @@ namespace DoubTech.ThirdParty.AI.Common
         public UnityEvent<string> onPartialResponseReceived = new UnityEvent<string>();
         public UnityEvent<string> onFullResponseReceived = new UnityEvent<string>();
         public UnityEvent<string> onError = new UnityEvent<string>();
+        
+        private IPartialResponseHandler[] _partialResponseHandlers;
+        private IFullResponseHandler[] _fullResponseHandlers;
 
         public bool Stream => stream;
         public string Model => model;
@@ -93,6 +97,9 @@ namespace DoubTech.ThirdParty.AI.Common
                     basePrompt = provider.BasePrompt;
                 }
             }
+
+            _fullResponseHandlers = GetComponentsInChildren<IFullResponseHandler>();
+            _partialResponseHandlers = GetComponentsInChildren<IPartialResponseHandler>();
         }
 
         public void PartialPrompt(string prompt)
@@ -419,8 +426,22 @@ namespace DoubTech.ThirdParty.AI.Common
                 }
                 else if (!string.IsNullOrEmpty(processedResponse.response))
                 {
-                    if(processedResponse.isFullResponse) onFullResponseReceived?.Invoke(processedResponse.response);
-                    else onPartialResponseReceived?.Invoke(processedResponse.response);
+                    if (processedResponse.isFullResponse)
+                    {
+                        onFullResponseReceived?.Invoke(processedResponse.response);
+                        foreach (var fullResponseHandler in _fullResponseHandlers)
+                        {
+                            fullResponseHandler.OnFullResponse(processedResponse.response);
+                        }
+                    }
+                    else
+                    {
+                        onPartialResponseReceived?.Invoke(processedResponse.response);
+                        foreach (var partialResponseHandler in _partialResponseHandlers)
+                        {
+                            partialResponseHandler.OnPartialResponse(processedResponse.response);
+                        }
+                    }
                 }
             }
         }
