@@ -1,6 +1,9 @@
 {
     "name": "DoubTech.ThirdParty.AI.Common",
     "rootNamespace": "DoubTech.ThirdParty.AI.Common",
+    "references": [
+        "GUID:2665a8d13d1b3f18800f46e256720795"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
@@ -8,6 +11,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.burst",
+            "expression": "",
+            "define": "USE_BURST"
+        }
+    ],
     "noEngineReferences": false
 }
