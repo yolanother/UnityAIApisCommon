@@ -123,6 +123,8 @@ namespace DoubTech.ThirdParty.AI.Common
              };
 
             if(includeMessageHistory) promptMessages.AddRange(MessageHistory);
+            else if(BasePrompt) promptMessages.AddRange(BasePrompt.messages);
+            
             if(null != additionalMessages) promptMessages.AddRange(additionalMessages);
             promptMessages.Add(promptMessage);
             if(saveMessageHistory) _messageHistory.Add(promptMessage);
