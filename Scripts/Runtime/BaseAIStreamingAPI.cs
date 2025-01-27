@@ -24,8 +24,10 @@ namespace DoubTech.ThirdParty.AI.Common
     public abstract class BaseAIStreamingAPI : MonoBehaviour
     {
         [Header("Prompt Config")]
-        [SerializeField]
-        public bool preserveMessageHistory = true;
+        [Tooltip("Adds the prompt to the message history after a prompt is executed unless otherwise specified")]
+        [SerializeField] public bool preserveMessageHistory = true;
+        [Tooltip("Includes the full message history with the prompt when not specified otherwise")]
+        [SerializeField] public bool includeMessageHistory = true;
         [SerializeField] private BasePrompt basePrompt;
         [SerializeField] private Message[] messages;
 
@@ -115,35 +117,66 @@ namespace DoubTech.ThirdParty.AI.Common
         }
         
         protected virtual List<Message> OnPrepareMessages(IEnumerable<Message> additionalMessages, string prompt, bool includeMessageHistory, bool saveMessageHistory) {
-            List<Message> promptMessages = new List<Message>();
+            List<Message> promptMessages = new List<Message>(additionalMessages);
             var promptMessage = new Message
-             {
-                 role = Roles.User,
-                 content = prompt
-             };
+            {
+                role = Roles.User,
+                content = prompt
+            };
+            promptMessages.Add(promptMessage);
+            
+            return OnPrepareMessages(promptMessages, includeMessageHistory, saveMessageHistory);
+        }
+
+        protected virtual List<Message> OnPrepareMessages(IEnumerable<string> additionalMessages,
+            bool includeMessageHistory, bool saveMessageHistory)
+        {
+            List<Message> promptMessages = new List<Message>();
+            foreach (var message in additionalMessages)
+            {
+                var promptMessage = new Message
+                {
+                    role = Roles.User,
+                    content = message
+                };
+                promptMessages.Add(promptMessage);
+            }
+
+            return OnPrepareMessages(promptMessages, includeMessageHistory, saveMessageHistory);
+        }
+
+        protected virtual List<Message> OnPrepareMessages(IEnumerable<Message> additionalMessages, bool includeMessageHistory, bool saveMessageHistory)
+        {
+            List<Message> promptMessages = new List<Message>();
 
             if(includeMessageHistory) promptMessages.AddRange(MessageHistory);
             else if(BasePrompt) promptMessages.AddRange(BasePrompt.messages);
             
             if(null != additionalMessages) promptMessages.AddRange(additionalMessages);
-            promptMessages.Add(promptMessage);
-            if(saveMessageHistory) _messageHistory.Add(promptMessage);
+            if(saveMessageHistory) _messageHistory.AddRange(additionalMessages);
             
             return promptMessages;
         }
-            
 
-        // Submits a prompt and maintains a history of submissions and responses
-        public void Prompt(string prompt)
-        {
-            Prompt(prompt, true);
-        }
-        
         public void Prompt(string prompt, bool includeMessageHistory)
         {
-            var promptMessages = OnPrepareMessages(prompt, includeMessageHistory, includeMessageHistory);
+            var promptMessages = OnPrepareMessages(prompt, includeMessageHistory, preserveMessageHistory);
             if(null == promptMessages) return;
             Submit(promptMessages, includeMessageHistory);
+        }
+
+        public void Prompt(string prompt, bool includeMessageHistory, bool preserveMessageHistory)
+        {
+            var promptMessages = OnPrepareMessages(prompt, includeMessageHistory, preserveMessageHistory);
+            if(null == promptMessages) return;
+            Submit(promptMessages, includeMessageHistory);
+        }
+        
+        public void Prompt(params string[] prompts)
+        {
+            var promptMessages = OnPrepareMessages(prompts, includeMessageHistory, preserveMessageHistory);
+            if(null == promptMessages) return;
+            Submit(promptMessages, preserveMessageHistory);
         }
 
         protected virtual string GetRole(Roles role)
