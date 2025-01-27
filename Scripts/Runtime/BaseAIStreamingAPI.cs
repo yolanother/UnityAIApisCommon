@@ -117,7 +117,7 @@ namespace DoubTech.ThirdParty.AI.Common
         }
         
         protected virtual List<Message> OnPrepareMessages(IEnumerable<Message> additionalMessages, string prompt, bool includeMessageHistory, bool saveMessageHistory) {
-            List<Message> promptMessages = new List<Message>(additionalMessages);
+            List<Message> promptMessages = null != additionalMessages ? new(additionalMessages) : new();
             var promptMessage = new Message
             {
                 role = Roles.User,
