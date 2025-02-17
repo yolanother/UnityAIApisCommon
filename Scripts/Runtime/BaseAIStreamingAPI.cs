@@ -46,6 +46,8 @@ namespace DoubTech.ThirdParty.AI.Common
         
         private IPartialResponseHandler[] _partialResponseHandlers;
         private IFullResponseHandler[] _fullResponseHandlers;
+        
+        private IPromptModifier[] _promptModifiers;
 
         public bool Stream => stream;
         public string Model => model;
@@ -89,7 +91,12 @@ namespace DoubTech.ThirdParty.AI.Common
                 return allMessages.ToArray();
             }
         }
-        
+
+        protected void Start()
+        {
+            _promptModifiers = GetComponentsInChildren<IPromptModifier>();
+        }
+
         protected virtual void OnEnable() {
             if(!basePrompt)
             {
@@ -234,6 +241,13 @@ namespace DoubTech.ThirdParty.AI.Common
         
         protected virtual UnityWebRequest OnPrepareRequest(List<Message> promptMessages)
         {
+            if (_promptModifiers != null)
+            {
+                foreach (var promptModifier in _promptModifiers)
+                {
+                    promptModifier.OnModifyPrompt(promptMessages);
+                }
+            }
             var postData = PreparePostData(promptMessages);
             var url = PrepareRequestUrl();
 
