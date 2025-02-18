@@ -69,7 +69,15 @@ namespace DoubTech.ThirdParty.AI.Common
                 var allMessages = new List<Message>();
                 if (BasePrompt != null)
                 {
-                    allMessages.AddRange(BasePrompt.messages);
+                    // Copy all the base prompt messages, we don't want to modify them down the line
+                    foreach (var message in BasePrompt.messages)
+                    {
+                        allMessages.Add(new Message
+                        {
+                            role = message.role,
+                            content = message.content
+                        });
+                    }
                 }
                 
                 return allMessages;
@@ -157,7 +165,18 @@ namespace DoubTech.ThirdParty.AI.Common
             List<Message> promptMessages = new List<Message>();
 
             if(includeMessageHistory) promptMessages.AddRange(MessageHistory);
-            else if(BasePrompt) promptMessages.AddRange(BasePrompt.messages);
+            else if (BasePrompt)
+            {
+                // Copy all of the base prompt messsages, we don't want to modify them down the line
+                foreach (var message in BasePrompt.messages)
+                {
+                    promptMessages.Add(new Message
+                    {
+                        role = message.role,
+                        content = message.content
+                    });
+                }
+            }
             
             if(null != additionalMessages) promptMessages.AddRange(additionalMessages);
             if(saveMessageHistory) _messageHistory.AddRange(additionalMessages);
