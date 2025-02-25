@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace DoubTech.ThirdParty.AI.Common.Utilities
 {
@@ -11,6 +12,17 @@ namespace DoubTech.ThirdParty.AI.Common.Utilities
     {
         private static SynchronizationContext mainThreadContext;
         private static Foregrounder foregrounderInstance;
+
+        public static void HandleErrors(this Task task)
+        {
+            task.ContinueWith((t, state) =>
+            {
+                if (null != t.Exception)
+                {
+                    Debug.LogError(task.Exception);
+                }
+            }, null);
+        }
 
         /// <summary>
         /// Initializes the synchronization context to the current context. Should be called from the main thread.

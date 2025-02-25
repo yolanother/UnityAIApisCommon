@@ -181,6 +181,28 @@ namespace DoubTech.ThirdParty.AI.Common
             if(null != additionalMessages) promptMessages.AddRange(additionalMessages);
             if(saveMessageHistory) _messageHistory.AddRange(additionalMessages);
             
+            
+            if (_promptModifiers != null)
+            {
+                foreach (var promptModifier in _promptModifiers)
+                {
+                    if(null == promptModifier) continue;
+                    var b = promptModifier as Behaviour;
+                    if (b && !b.isActiveAndEnabled) continue;
+                    try
+                    {
+                        promptModifier.OnModifyPrompt(promptMessages);
+                    }
+                    catch (Exception e)
+                    {
+                        var n = b ? b.name : promptModifier.ToString();
+                        Debug.LogError($"Failed to apply prompt modifier {promptModifier.GetType().Name} on {n}");
+                        Debug.LogError(e);
+                        throw e;
+                    }
+                }
+            }
+            
             return promptMessages;
         }
 
@@ -260,13 +282,6 @@ namespace DoubTech.ThirdParty.AI.Common
         
         protected virtual UnityWebRequest OnPrepareRequest(List<Message> promptMessages)
         {
-            if (_promptModifiers != null)
-            {
-                foreach (var promptModifier in _promptModifiers)
-                {
-                    promptModifier.OnModifyPrompt(promptMessages);
-                }
-            }
             var postData = PreparePostData(promptMessages);
             var url = PrepareRequestUrl();
 
@@ -373,7 +388,7 @@ namespace DoubTech.ThirdParty.AI.Common
             string url = apiConfig.GetUrl(OnGetRequestPath());
             url = apiConfig.GenerateFullUrl(url);
             
-            Debug.Log("Full url: " + url);
+            Debug.Log($"Full Request: {url}\n{postData}");
         
             return new RequestData {
                 url = url,

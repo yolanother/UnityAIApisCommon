@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using DoubTech.ThirdParty.AI.Common.Data;
+using DoubTech.ThirdParty.AI.Common.Utilities;
 using Meta.Voice.NPCs.OpenAIApi.Providers;
 using UnityEditor;
 using UnityEngine;
@@ -27,7 +28,7 @@ namespace DoubTech.ThirdParty.AI.Common
 
         public void Prompt(string text)
         {
-            _ = PromptAsync(text);
+            PromptAsync(text).HandleErrors();
         }
         
         public async Task<Response> PromptAsync(string text, bool includeMessageHistory = false) 
